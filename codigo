@@ -1,0 +1,902 @@
+//bibliotecas --------------------------------------------------------------------------
+#include <stdio.h>
+#include <stdlib.h>
+#include <GL/glut.h>
+#include <math.h>
+#include <vector>
+#include <string>
+
+
+//constantes---------------------------------------------------------------------------
+const std::string word = "Oxigenio:"; //utilizada para escrever na tela
+#define PI 3.1415926535898 
+#define janela_altura 400
+#define janela_largura 600
+#define tamPeixe 4
+#define tamSubInimigo 3
+#define tamMergulhador 4
+
+//variáveis globais -------------------------------------------------------------------
+float trans = 0;
+float transH = 0;
+int ultimaTecla = 0;
+int nivelOxigenio = 200; // Nível de oxigênio inicial
+int direcaoTiro = 0;
+int pontos = 0;
+
+//variáveis das posições do submarino
+float posSubW = 135;
+float posSubS = 95;
+float posSubA = -40;
+float posSubD = 30;
+
+//variáveis das posições do tiro do submario
+float posTiroXEsq = -20;
+float posTiroXDir = 0;
+float posTiroYAci = 110;
+float posTiroYEmb = 105;
+float transTiro = 0;
+float transHTiro = 0;
+
+int posicaoPeixes[] = { 70, 20, -30, -80 };
+int posicaoMergulhador[] = { 60, 20, -20, -60 };
+int posicaoSubInimigo[] = { -60, 0, 60 };
+int pontuacao = 0;
+
+//structs ------------------------------------------------------------------------------
+typedef struct {
+	float xEsquerdo;
+	float xDireito;
+	float yAcima;
+	float yEmbaixo;
+	float trans;
+}Objetos;
+
+//prototipação -------------------------------------------------------------------------
+void display(void);
+void tela(GLsizei w, GLsizei h);
+void keyboard(unsigned char tecla, int x, int y);
+void update(int valor);
+Objetos** peixes;
+Objetos** mergulhadores;
+Objetos** submarinoInimigos;
+Objetos** alocarMemoriaVetor(int);
+Objetos* alocarMemoriaObjeto();
+void cenario();
+void submarino();
+void peixe(Objetos*, int);
+void criarElementosJogo();
+void populaVetores();
+void submarinoInimigo(Objetos*, int);
+void mergulhador(Objetos*, int);
+void barraOxigenio();
+void animacaoPeixes(int);
+void update(int);
+void animacaoSubInimigos(int);
+void colisaoPeixe();
+void colisaoSubmarinoInimigo();
+void animacaoMergulhadores(int);
+void animacaoTiro(int);
+void colisaoTiro();
+
+//------------------------------------------------------------------MAIN---------------------------------------------------------------------------//
+int main(int argc, char** argv) {
+
+	//inicializar os vetores
+	mergulhadores = alocarMemoriaVetor(tamMergulhador);
+	peixes = alocarMemoriaVetor(tamPeixe);
+	submarinoInimigos = alocarMemoriaVetor(tamSubInimigo);
+
+	criarElementosJogo();
+
+	glutInit(&argc, argv);	// suporte a janelas  
+	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);// PADRAO DE CORES 
+
+	glutInitWindowSize(janela_largura, janela_altura);  // tamanho da janela
+	glutInitWindowPosition(100, 100); // posicao que surge a janela
+	glutCreateWindow("Seaquest"); // cria janela 
+	glutTimerFunc(150, animacaoTiro, 1);
+
+	//glutFullScreen();
+	glutKeyboardFunc(&keyboard);  // chama teclado 
+	glutReshapeFunc(tela);  // configura a tela
+	glutDisplayFunc(display);
+	glutPostRedisplay();
+
+	glutTimerFunc(150, animacaoPeixes, 1);
+	glutTimerFunc(100, update, 1);
+	glutTimerFunc(150, animacaoSubInimigos, 1);
+	glutTimerFunc(150, animacaoMergulhadores, 1);
+	//printf("Oxigenio: %i", nivelOxigenio);
+	glutMainLoop(); // redesenhar
+	return(0);
+}
+
+//----------------------------------------------------------ALOCAÇÃO E LIBERAÇÃO DE MEMÓRIA------------------------------------------------------//
+
+//alocar memoria para os vetores dos objetos do jogo
+Objetos** alocarMemoriaVetor(int tam) {
+	Objetos** vetor;
+	vetor = (Objetos**)malloc(sizeof(Objetos) * tam);
+	return vetor;
+}
+
+//alocar memoria para os objetos do vetor
+Objetos* alocarMemoriaObjeto() {
+	Objetos* elemento = (Objetos*)malloc(sizeof(Objetos));
+	elemento->trans = 0;
+	return elemento;
+}
+
+void liberarMemoriaVetor(int tam, Objetos** obj) {
+	for (int i = 0; i < tam; i++) {
+		free(obj[i]);
+	}
+	free(obj);
+}
+
+//---------------------------------------------------------CRIAÇÃO DOS ELEMENTOS DO JOGO + DESENHOS -------------------------------------------//
+
+//cria vetores dos elementos do jogo: mergulhador, peixes, submarino inimigo
+void criarElementosJogo() {
+	for (int i = 0; i < tamPeixe; i++) {
+		peixes[i] = alocarMemoriaObjeto();
+	}
+
+	for (int i = 0; i < tamMergulhador; i++) {
+		mergulhadores[i] = alocarMemoriaObjeto();
+	}
+
+	for (int i = 0; i < tamSubInimigo; i++) {
+		submarinoInimigos[i] = alocarMemoriaObjeto();
+	}
+}
+
+//popula os vetores com os elementos do jogo: mergulhador, peixes, submarino inimigo
+void populaVetores() {
+	for (int i = 0; i < tamPeixe; i++) {
+		glPushMatrix();
+		glTranslatef(peixes[i]->trans, 0, 0);
+		peixe(peixes[i], i);
+		glPopMatrix();
+		//printf("X: %f", peixes[i]->xEsquerdo);
+	}
+
+	for (int i = 0; i < tamSubInimigo; i++) {
+		submarinoInimigo(submarinoInimigos[i], i);
+		glPushMatrix();
+		glTranslatef(submarinoInimigos[i]->trans, 0, 0);
+		submarinoInimigo(submarinoInimigos[i], i);
+		glPopMatrix();
+	}
+
+	for (int i = 0; i < tamMergulhador; i++) {
+		mergulhador(mergulhadores[i], i);
+		glPushMatrix();
+		glTranslatef(mergulhadores[i]->trans, 0, 0);
+		mergulhador(mergulhadores[i], i);
+		glPopMatrix();
+	}
+}
+
+//DESENHOS:
+void cenario() {
+	//barra preta
+	glBegin(GL_QUADS);
+	glColor3f(0.0, 0.0, 0.0);  // preto
+	glVertex2f(-300, -200);
+	glVertex2f(-300, -180);
+	glVertex2f(300, -180);
+	glVertex2f(300, -200);
+	glEnd();
+
+	//barra cinza
+	glBegin(GL_QUADS);
+	glColor3ub(142, 142, 142);  // cinza
+	glVertex2f(-300, -180);
+	glVertex2f(-300, -130);
+	glVertex2f(300, -130);
+	glVertex2f(300, -180);
+	glEnd();
+
+	//barra verde
+	glBegin(GL_QUADS);
+	glColor3ub(0, 68, 0);  // verde
+	glVertex2f(-300, -130);
+	glVertex2f(-300, -100);
+	glVertex2f(300, -100);
+	glVertex2f(300, -130);
+	glEnd();
+
+	//água (parte de cima)
+	glBegin(GL_QUADS);
+	glColor3ub(0, 42, 136); // azul escuro
+	glVertex2f(-300, 150);
+	glVertex2f(-300, 90);
+	glVertex2f(300, 90);
+	glVertex2f(300, 150);
+
+	//água (borda)
+	glBegin(GL_QUADS);
+	glColor3ub(0, 0, 0); // azul mais claro
+	glVertex2f(-300, 151);
+	glVertex2f(-300, 158);
+	glVertex2f(300, 151);
+	glVertex2f(300, 158);
+
+	//céu
+	glBegin(GL_QUADS);
+	glColor3ub(45, 50, 184);  // cor
+	glVertex2f(-300, 200);
+	glColor3ub(171, 91, 36);
+	glVertex2f(-300, 160);
+	glColor3ub(78, 50, 181);
+	glVertex2f(300, 160);
+
+	glVertex2f(300, 200);
+
+	//céu por do sol
+	glBegin(GL_QUADS);
+	glColor3ub(78, 50, 181);  // cor
+	glVertex2f(-300, 160);
+	glColor3ub(168, 48, 143);
+	glVertex2f(-300, 130);
+	glColor3ub(184, 50, 50);
+	glVertex2f(300, 130);
+	glColor3ub(171, 91, 36);
+	glVertex2f(300, 160);
+	glEnd();
+}
+
+void submarino() {
+	glTranslatef(0, 0, 0);
+	glPushMatrix();  //// empilhei e armazenei a matriz 
+
+	glTranslatef(trans, transH, 0);
+	//aqui fica o desenho do submarino
+	glBegin(GL_QUADS); //corpo
+	glColor3ub(194, 194, 73);  // cor
+	glVertex2f(-40, 100);
+	glVertex2f(-40, 120);
+	glVertex2f(20, 120);
+	glVertex2f(20, 100);
+	glEnd();
+
+	glBegin(GL_QUADS); //torrezinha 
+	glColor3ub(194, 194, 73);  // cor 
+	glVertex2f(10, 120);
+	glVertex2f(10, 135);
+	glVertex2f(0, 135);
+	glVertex2f(0, 120);
+	glEnd();
+
+	glBegin(GL_TRIANGLES); //barbatana  
+	glColor3ub(194, 194, 73);  // cor  
+	glVertex2f(20, 110);
+	glVertex2f(30, 125);
+	glVertex2f(30, 95);
+	glEnd();
+
+	glBegin(GL_POINTS); //janelas
+	glPointSize(5);
+	glColor3ub(0, 0, 0);
+	glVertex2i(-30, 110);
+	glVertex2i(-15, 110);
+	glVertex2i(-0, 110);
+	glEnd();
+
+	glPopMatrix();  //restaurei a matriz da pilha 
+}
+
+void peixe(Objetos* peixe, int i) {
+
+	peixe->xEsquerdo = -325;
+	peixe->yAcima = posicaoPeixes[i];
+	peixe->yEmbaixo = posicaoPeixes[i] - 10;
+	peixe->xDireito = -300;
+
+
+	//glPushMatrix();  //// empilhei e armazenei a matriz   
+	//desenho do peixe
+
+	glBegin(GL_QUADS);
+	glColor3ub(168, 48, 143);  // cor 
+	glVertex2f(-320, posicaoPeixes[i] - 6);
+	glVertex2f(-310, posicaoPeixes[i]);
+	glVertex2f(-300, posicaoPeixes[i] - 6);
+	glVertex2f(-310, posicaoPeixes[i] - 10);
+	glEnd();
+
+	glBegin(GL_TRIANGLES);
+	glColor3ub(168, 48, 143);
+	glVertex2i(-320, posicaoPeixes[i] - 6);
+	glVertex2i(-325, posicaoPeixes[i]);
+	glVertex2i(-325, posicaoPeixes[i] - 10);
+
+	glEnd();
+	//glPopMatrix();  //restaurei a matriz da pilha  
+
+}
+
+void submarinoInimigo(Objetos* submarinoInimigo, int i) {
+
+	submarinoInimigo->xEsquerdo = 310;
+	submarinoInimigo->xDireito = 340;
+	submarinoInimigo->yAcima = posicaoSubInimigo[i];
+	submarinoInimigo->yEmbaixo = posicaoSubInimigo[i] - 25;
+
+	//glPushMatrix();  //// empilhei e armazenei a matriz  
+	//aqui fica o desenho do submarino inimigo
+	glBegin(GL_QUADS); //corpo 
+	glColor3ub(170, 170, 170);  // cor 
+	glVertex2f(310, posicaoSubInimigo[i] - 25);
+	glVertex2f(310, posicaoSubInimigo[i] - 10);
+	glVertex2f(335, posicaoSubInimigo[i] - 10);
+	glVertex2f(335, posicaoSubInimigo[i] - 25);
+	glEnd();
+
+	glBegin(GL_QUADS); //torrezinha  
+	glColor3ub(170, 170, 170);  // cor  
+	glVertex2f(320, posicaoSubInimigo[i] - 10);
+	glVertex2f(320, posicaoSubInimigo[i]);
+	glVertex2f(325, posicaoSubInimigo[i]);
+	glVertex2f(325, posicaoSubInimigo[i] - 10);
+	glEnd();
+
+	glBegin(GL_TRIANGLES); //barbatana  
+	glColor3ub(170, 170, 170);  // cor   
+	glVertex2f(335, posicaoSubInimigo[i] - 20);
+	glVertex2f(340, posicaoSubInimigo[i] - 5);
+	glVertex2f(340, posicaoSubInimigo[i] - 25);
+	glEnd();
+
+	glBegin(GL_POINTS); //janelas 
+	glPointSize(5);
+	glColor3ub(0, 0, 0);
+	glVertex2i(315, posicaoSubInimigo[i] - 20);
+	glVertex2i(320, posicaoSubInimigo[i] - 20);
+	glVertex2i(325, posicaoSubInimigo[i] - 20);
+	glEnd();
+
+	//glPopMatrix();  //restaurei a matriz da pilha  
+
+}
+
+void mergulhador(Objetos* mergulhador, int i) {
+	mergulhador->xDireito = -305;
+	mergulhador->xEsquerdo = -335;
+	mergulhador->yAcima = posicaoMergulhador[i];
+	mergulhador->yEmbaixo = posicaoMergulhador[i];
+
+
+	glTranslatef(0, 0, 0);
+	glPushMatrix();  //// empilhei e armazenei a matriz  
+
+	//cabeça
+	glBegin(GL_QUADS); //corpo  
+	glColor3ub(181, 83, 40);  // cor  
+	glVertex2f(-310, posicaoMergulhador[i] - 5);
+	glVertex2f(-305, posicaoMergulhador[i] - 5);
+	glVertex2f(-305, posicaoMergulhador[i]);
+	glVertex2f(-310, posicaoMergulhador[i]);
+	glEnd();
+
+	//corpo
+	glBegin(GL_LINES);
+	glColor3ub(181, 83, 40);
+	glVertex2f(-310, posicaoMergulhador[i] - 5);
+	glVertex2f(-335, posicaoMergulhador[i] - 20);
+	glEnd();
+
+	//perna
+	glBegin(GL_LINES);
+	glColor3ub(181, 83, 40);
+	glVertex2f(-330, posicaoMergulhador[i] - 15);
+	glVertex2f(-335, posicaoMergulhador[i] - 15);
+	glEnd();
+
+	//braço
+	glBegin(GL_LINES);
+	glColor3ub(181, 83, 40);
+	glVertex2f(-316, posicaoMergulhador[i] - 5);
+	glVertex2f(-306, posicaoMergulhador[i] - 10);
+	glEnd();
+
+	glPopMatrix();   //restaurei a matriz da pilha 
+
+}
+
+void barraOxigenio() {
+	float xLeft = -150, xRight = -149;
+	// Calcula a largura proporcional da barra de oxigênio
+
+	// Desenha o fundo da barra de oxigênio (retângulo laranjado)
+	glColor3ub(181, 83, 40);
+	glRectf(-150, -145, 70, -160);
+
+	// Desenha a barra de oxigênio atual (retângulo branco)
+	for (int i = 0; i < nivelOxigenio; i++) {
+		glBegin(GL_QUADS);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		glVertex2f(xLeft, -145);
+		glVertex2f(xLeft, -160);
+		glVertex2f(xRight, -160);
+		glVertex2f(xRight, -145);
+		glEnd();
+		xLeft += 1;
+		xRight += 1;
+	}
+}
+
+void tiro() {
+	glPushMatrix();  //// empilhei e armazenei a matriz  
+	if (transTiro != 0) {
+		glTranslatef(transTiro, transHTiro, 0);
+	}
+	else {
+		glTranslatef(trans, transH, 0);
+	}
+	glBegin(GL_QUADS);
+	glColor3f(1.0f, 1.0f, 1.0f);
+	glVertex2f(posTiroXEsq, posTiroYAci);
+	glVertex2f(posTiroXEsq, posTiroYEmb);
+	glVertex2f(posTiroXDir, posTiroYEmb);
+	glVertex2f(posTiroXDir, posTiroYAci);
+	glEnd();
+
+	glPopMatrix();   //restaurei a matriz da pilha
+	//restaurei a matriz da pilha 
+}
+
+//----------------------------------------------------------------- ANIMAÇÕES --------------------------------------------------------------------------------------------
+void animacaoPeixes(int valor) {
+	for (int i = 0; i < tamPeixe; i++) {
+		if ((peixes[i]->xEsquerdo + peixes[i]->trans) >= 300) {
+			peixes[i]->trans = 0;
+		}
+
+		peixes[i]->trans += 5;
+	}
+	glutPostRedisplay();
+	glutTimerFunc(150, animacaoPeixes, valor);
+}
+
+void animacaoSubInimigos(int valor) {
+	for (int i = 0; i < tamSubInimigo; i++) {
+		if ((submarinoInimigos[i]->xEsquerdo + submarinoInimigos[i]->trans) <= -300) {
+			submarinoInimigos[i]->trans = 0;
+		}
+		//printf("%f", submarinoInimigos[i]->trans);
+		submarinoInimigos[i]->trans -= 3;
+	}
+	glutPostRedisplay();
+	glutTimerFunc(150, animacaoSubInimigos, valor);
+}
+
+void animacaoMergulhadores(int valor) {
+	for (int i = 0; i < tamMergulhador; i++) {
+		if ((mergulhadores[i]->xEsquerdo + mergulhadores[i]->trans) >= 300) {
+			mergulhadores[i]->trans = 0;
+		}
+		//printf("%f", submarinoInimigos[i]->trans);
+		mergulhadores[i]->trans += 2;
+	}
+	glutPostRedisplay();
+	glutTimerFunc(150, animacaoMergulhadores, valor);
+}
+
+void animacaoTiro(int valor) {
+	if (transTiro != 0) {
+		if (direcaoTiro == 1) {
+			if ((posTiroXDir + transTiro) < -300) {
+				transTiro = 0;
+			}
+			else {
+				transTiro -= 25;
+			}
+
+		}
+		else if (direcaoTiro == 0) {
+			if ((posTiroXEsq + transTiro) > 300) {
+				transTiro = 0;
+			}
+			else {
+				transTiro += 25;
+			}
+		}
+	}
+	glutPostRedisplay();
+	glutTimerFunc(150, animacaoTiro, valor);
+}
+
+//------------------------------------------------------------------------ COLISÕES -------------------------------------------------------------------------
+
+void colisaoPeixe() {
+	for (int i = 0; i < tamPeixe; i++) {
+		int xesq = peixes[i]->xEsquerdo;
+		int xdir = peixes[i]->xDireito;
+		int yaci = peixes[i]->yAcima;
+		int yemb = peixes[i]->yEmbaixo;
+		int transP = peixes[i]->trans;
+
+
+		//verificar colisão do ponto esquerdo do peixe é > que ponto esquerdo do submarino e - que o ponto direito do submarino
+		if ((xesq + transP) > (posSubA + trans)) {
+			if ((xesq + transP) < (posSubD + trans)) { //verificar colisão do ponto esquerdo + translate horizontal é < que o ponto direito + translate horizontal do submarino
+				//verificar colisão do ponto acima do peixe é > que o ponto abaixo + translate vertical do submarino
+				if (yaci > (posSubS + transH)) {
+					if (yaci < (posSubW + transH)) { //verificar colisão do ponto acima do peixe é < que o ponto acima + translate vertical do submarino
+						peixes[i]->trans = 0;
+						trans = 0;
+						transH = 0;
+						pontos = 0;
+
+					}
+				}//agora fazer a verificação do ponto debaixo
+				else if (yemb > (posSubS + transH)) {
+					if (yemb < (posSubW + transH)) {
+						peixes[i]->trans = 0;
+						trans = 0;
+						transH = 0;
+						pontos = 0;
+
+					}
+				}
+			}
+
+		}//agora fazer a verificação do ponto direito
+		else if ((xdir + transP) > (posSubA + trans)) {
+			if ((xdir + transP) < (posSubD + trans)) {
+				//verificar colisão do ponto acima do peixe é > que o ponto abaixo + translate vertical do submarino
+				if (yaci > (posSubS + transH)) {
+					if (yaci < (posSubW + transH)) { //verificar colisão do ponto acima do peixe é < que o ponto acima + translate vertical do submarino
+						peixes[i]->trans = 0;
+						trans = 0;
+						transH = 0;
+						pontos = 0;
+
+					}
+				}//agora fazer a verificação do ponto debaixo
+				else if (yemb > (posSubS + transH)) {
+					if (yemb < (posSubW + transH)) {
+						peixes[i]->trans = 0;
+						trans = 0;
+						transH = 0;
+						pontos = 0;
+
+					}
+				}
+			}
+		}
+	}
+}
+
+void colisaoSubmarinoInimigo() {
+	for (int i = 0; i < tamSubInimigo; i++) {
+		int xesq = submarinoInimigos[i]->xEsquerdo;
+		int xdir = submarinoInimigos[i]->xDireito;
+		int yaci = submarinoInimigos[i]->yAcima;
+		int yemb = submarinoInimigos[i]->yEmbaixo;
+		int transP = submarinoInimigos[i]->trans;
+
+
+		//verificar colisão do ponto esquerdo do peixe é > que ponto esquerdo do submarino e - que o ponto direito do submarino
+		if ((xesq + transP) > (posSubA + trans)) {
+			if ((xesq + transP) < (posSubD + trans)) { //verificar colisão do ponto esquerdo + translate horizontal é < que o ponto direito + translate horizontal do submarino
+				//verificar colisão do ponto acima do peixe é > que o ponto abaixo + translate vertical do submarino
+				if (yaci > (posSubS + transH)) {
+					if (yaci < (posSubW + transH)) { //verificar colisão do ponto acima do peixe é < que o ponto acima + translate vertical do submarino
+						submarinoInimigos[i]->trans = 0;
+						trans = 0;
+						transH = 0;
+						pontos = 0;
+
+					}
+				}//agora fazer a verificação do ponto debaixo
+				else if (yemb > (posSubS + transH)) {
+					if (yemb < (posSubW + transH)) {
+						submarinoInimigos[i]->trans = 0;
+						trans = 0;
+						transH = 0;
+						pontos = 0;
+
+					}
+				}
+			}
+
+		}//agora fazer a verificação do ponto direito
+		else if ((xdir + transP) > (posSubA + trans)) {
+			if ((xdir + transP) < (posSubD + trans)) {
+				//verificar colisão do ponto acima do peixe é > que o ponto abaixo + translate vertical do submarino
+				if (yaci > (posSubS + transH)) {
+					if (yaci < (posSubW + transH)) { //verificar colisão do ponto acima do peixe é < que o ponto acima + translate vertical do submarino
+						submarinoInimigos[i]->trans = 0;
+						trans = 0;
+						transH = 0;
+						pontos = 0;
+
+					}
+				}//agora fazer a verificação do ponto debaixo
+				else if (yemb > (posSubS + transH)) {
+					if (yemb < (posSubW + transH)) {
+						submarinoInimigos[i]->trans = 0;
+						trans = 0;
+						transH = 0;
+						pontos = 0;
+
+					}
+				}
+			}
+		}
+	}
+}
+
+void colisaoMergulhador() {
+	for (int i = 0; i < tamMergulhador; i++) {
+		int xesq = mergulhadores[i]->xEsquerdo;
+		int xdir = mergulhadores[i]->xDireito;
+		int yaci = mergulhadores[i]->yAcima;
+		int yemb = mergulhadores[i]->yEmbaixo;
+		int transP = mergulhadores[i]->trans;
+
+
+		//verificar colisão do ponto esquerdo do peixe é > que ponto esquerdo do submarino e - que o ponto direito do submarino
+		if ((xesq + transP) > (posSubA + trans)) {
+			if ((xesq + transP) < (posSubD + trans)) { //verificar colisão do ponto esquerdo + translate horizontal é < que o ponto direito + translate horizontal do submarino
+				//verificar colisão do ponto acima do peixe é > que o ponto abaixo + translate vertical do submarino
+				if (yaci > (posSubS + transH)) {
+					if (yaci < (posSubW + transH)) { //verificar colisão do ponto acima do peixe é < que o ponto acima + translate vertical do submarino
+						mergulhadores[i]->trans = 0;
+						pontos += 10;
+
+
+					}
+				}//agora fazer a verificação do ponto debaixo
+				else if (yemb > (posSubS + transH)) {
+					if (yemb < (posSubW + transH)) {
+						mergulhadores[i]->trans = 0;
+						pontos += 10;
+
+					}
+				}
+			}
+
+		}//agora fazer a verificação do ponto direito
+		else if ((xdir + transP) > (posSubA + trans)) {
+			if ((xdir + transP) < (posSubD + trans)) {
+				//verificar colisão do ponto acima do peixe é > que o ponto abaixo + translate vertical do submarino
+				if (yaci > (posSubS + transH)) {
+					if (yaci < (posSubW + transH)) { //verificar colisão do ponto acima do peixe é < que o ponto acima + translate vertical do submarino
+						mergulhadores[i]->trans = 0;
+						pontos += 10;
+
+					}
+				}//agora fazer a verificação do ponto debaixo
+				else if (yemb > (posSubS + transH)) {
+					if (yemb < (posSubW + transH)) {
+						mergulhadores[i]->trans = 0;
+						pontos += 10;
+
+					}
+				}
+			}
+		}
+	}
+}
+
+void colisaoTiro() {
+	for (int i = 0; i < tamPeixe; i++) {
+		float peixeLeft = peixes[i]->xEsquerdo;
+		float peixeRight = peixes[i]->xDireito;
+		float peixeUp = peixes[i]->yAcima;
+		float peixeDown = peixes[i]->yEmbaixo;
+		float peixeTrans = peixes[i]->trans;
+
+		if (peixeUp > posTiroYAci + transHTiro) {
+			if ((peixeDown < posTiroYAci + transHTiro)) {
+				if (peixeLeft + peixeTrans < posTiroXEsq + transTiro) {
+					if (peixeRight + peixeTrans > posTiroXEsq + transTiro) {
+						peixes[i]->trans = 0;
+						transTiro = 0;
+						transHTiro = 0;
+						pontos += 5;
+
+					}
+				}
+				else if (peixeRight + peixeTrans > posTiroXDir + transTiro) {
+					if (peixeLeft + peixeTrans < posTiroXDir + transTiro) {
+						peixes[i]->trans = 0;
+						transTiro = 0;
+						transHTiro = 0;
+						pontos += 5;
+
+					}
+				}
+			}
+		}
+		else if (peixeDown < posTiroYEmb + transHTiro) {
+			if (peixeUp > posTiroYEmb + transHTiro) {
+				if (peixeLeft + peixeTrans < posTiroXEsq + transTiro) {
+					if (peixeRight + peixeTrans > posTiroXEsq + transTiro) {
+						peixes[i]->trans = 0;
+						transTiro = 0;
+						transHTiro = 0;
+						pontos += 5;
+					}
+				}
+				else if (peixeRight + peixeTrans > posTiroXDir + transTiro) {
+					if (peixeLeft + peixeTrans < posTiroXDir + transTiro) {
+						peixes[i]->trans = 0;
+						transTiro = 0;
+						transHTiro = 0;
+						pontos += 5;
+					}
+				}
+			}
+		}
+	}
+
+	for (int i = 0; i < tamSubInimigo; i++) {
+		float SubInimigoLeft = submarinoInimigos[i]->xEsquerdo;
+		float SubInimigoRight = submarinoInimigos[i]->xDireito;
+		float SubInimigoUp = submarinoInimigos[i]->yAcima;
+		float SubInimigoDown = submarinoInimigos[i]->yEmbaixo;
+		float SubInimigoTrans = submarinoInimigos[i]->trans;
+
+		if (SubInimigoUp > posTiroYAci + transHTiro) {
+			if ((SubInimigoDown < posTiroYAci + transHTiro)) {
+				if (SubInimigoLeft + SubInimigoTrans < posTiroXEsq + transTiro) {
+					if (SubInimigoRight + SubInimigoTrans > posTiroXEsq + transTiro) {
+						submarinoInimigos[i]->trans = 0;
+						transTiro = 0;
+						transHTiro = 0;
+						pontos += 5;
+
+					}
+				}
+				else if (SubInimigoRight + SubInimigoTrans > posTiroXDir + transTiro) {
+					if (SubInimigoLeft + SubInimigoTrans < posTiroXDir + transTiro) {
+						submarinoInimigos[i]->trans = 0;
+						transTiro = 0;
+						transHTiro = 0;
+						pontos += 5;
+
+					}
+				}
+			}
+		}
+		else if (SubInimigoDown < posTiroYEmb + transHTiro) {
+			if (SubInimigoUp > posTiroYEmb + transHTiro) {
+				if (SubInimigoLeft + SubInimigoTrans < posTiroXEsq + transTiro) {
+					if (SubInimigoRight + SubInimigoTrans > posTiroXEsq + transTiro) {
+						submarinoInimigos[i]->trans = 0;
+						transTiro = 0;
+						transHTiro = 0;
+						pontos += 5;
+					}
+				}
+				else if (SubInimigoRight + SubInimigoTrans > posTiroXDir + transTiro) {
+					if (SubInimigoLeft + SubInimigoTrans < posTiroXDir + transTiro) {
+						submarinoInimigos[i]->trans = 0;
+						transTiro = 0;
+						transHTiro = 0;
+						pontos += 5;
+					}
+				}
+			}
+		}
+	}
+}
+
+//teclas a serem utilizadas: ---------------------------------------------------------------------------------------------------------------------
+void keyboard(unsigned char tecla, int x, int y) {
+	//printf("\no mouse estava em %d x %d\n", x, y);
+	if (tecla == 'a' || tecla == 'A') {
+		if ((trans + posSubA) >= -300)
+			trans = trans - 3;
+		ultimaTecla = 1;
+		//printf("\n o valor de translacao e %.2f\n", trans);
+	}
+	if (tecla == 'd' || tecla == 'D') {
+		if ((trans + posSubD) <= 300)
+			trans = trans + 3;
+		ultimaTecla = 0;
+		//printf("\n o valor de translacao e %.2f\n", trans);
+	}
+	if (tecla == 's' || tecla == 'S') {
+		if (transH >= -200)
+			transH = transH - 3;
+		//printf("\n o valor de translacao H e %.2f\n", transH);
+	}
+	if (tecla == 'w' || tecla == 'W') {
+		if ((transH + posSubW) <= 151)
+			transH = transH + 3;
+		//printf("\n o valor de translacao H e %.2f\n", transH);
+	}
+	if (tecla == 'q' || tecla == 'Q') {
+		// Disparar um novo projétil
+		if (transTiro == 0) {
+			if (ultimaTecla == 0) {
+				transTiro = trans + 25;
+				transHTiro = transH; 
+				direcaoTiro = 0;
+			}
+			else if (ultimaTecla == 1) {
+				transTiro = trans - 25;
+				transHTiro = transH;
+				direcaoTiro = 1;
+			}
+		}
+	}
+
+	glutPostRedisplay();
+}
+
+//Atualiza a barra de oxigênio -----------------------------------------------------------------------------------------------------------------
+void update(int value) {
+	// Atualiza o nível de oxigênio
+	if (nivelOxigenio > 0 && transH + posSubW < 130) {
+		nivelOxigenio--;
+		if (nivelOxigenio == 0) {
+			transH = 0;
+			trans = 0;
+		}
+	}
+	else if (nivelOxigenio < 220) {
+		nivelOxigenio++;
+	}
+
+	glutPostRedisplay();
+	glutTimerFunc(100, update, 1);
+}
+
+//--------------------------------------------------------------------- DISPLAY + TELA --------------------------------------------------------
+
+void display() {
+	glMatrixMode(GL_MODELVIEW);  //coordenadas de desenho 
+	glLoadIdentity();
+
+	glClearColor(0.0f, 0.10980392f, 0.533333f, 1.0f); // cor do fundo 
+	glClear(GL_COLOR_BUFFER_BIT); // EXECUTA LIMPEZA 
+
+	// Especificar o local aonde o desenho acontece: bem no centro da janela
+	glTranslatef(janela_largura / 2, janela_altura / 2, 0.0f);
+	glViewport(0, 0, janela_largura, janela_altura);
+
+	//Chama as funções
+	cenario(); 
+	tiro(); 
+	submarino(); 
+	barraOxigenio(); 
+	populaVetores(); 
+
+	colisaoPeixe(); 
+	colisaoSubmarinoInimigo(); 
+	colisaoMergulhador(); 
+	colisaoTiro(); 
+
+	//adiciona o texto "Oxigenio" 
+	glRasterPos2f(-260, -160);  // Define a posição inicial para desenhar o texto   
+	glColor3ub(0, 0, 0); 
+	for (char c : word) {
+		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, c);  // Renderiza cada caracter   
+	}
+
+	//converte a pontuacao de int para string e imprime na tela
+	std::string pontuacaoStr = std::to_string(pontos); 
+	glColor3f(1.0, 1.0, 1.0); 
+	glRasterPos2f(-250, 150);
+	for (char c : pontuacaoStr) {
+		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, c);
+	}
+
+	glFlush();  // execute o desenho
+}
+
+void tela(GLsizei w, GLsizei h) {
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	// cria a janela (esq, direita, embaixo, em cima)
+	gluOrtho2D(0, janela_largura, 0, janela_altura);
+	glMatrixMode(GL_MODELVIEW);
+}
