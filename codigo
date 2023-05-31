@@ -840,6 +840,7 @@ void update(int value) {
 		if (nivelOxigenio == 0) {
 			transH = 0;
 			trans = 0;
+			pontos = 0;
 		}
 	}
 	else if (nivelOxigenio < 220) {
@@ -900,3 +901,7 @@ void tela(GLsizei w, GLsizei h) {
 	gluOrtho2D(0, janela_largura, 0, janela_altura);
 	glMatrixMode(GL_MODELVIEW);
 }
+
+
+
+
