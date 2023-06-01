@@ -217,12 +217,12 @@ void cenario() {
 	glVertex2f(300, 150);
 
 	//água (borda)
-	glBegin(GL_QUADS);
-	glColor3ub(0, 0, 0); // azul mais claro
-	glVertex2f(-300, 151);
-	glVertex2f(-300, 158);
-	glVertex2f(300, 151);
-	glVertex2f(300, 158);
+	glBegin(GL_QUADS); 
+	glColor3ub(0, 0, 0); // azul mais claro 
+	glVertex2f(-300, 151); 
+	glVertex2f(-300, 158); 
+	glVertex2f(300, 151); 
+	glVertex2f(300, 158); 
 
 	//céu
 	glBegin(GL_QUADS);
@@ -232,7 +232,6 @@ void cenario() {
 	glVertex2f(-300, 160);
 	glColor3ub(78, 50, 181);
 	glVertex2f(300, 160);
-
 	glVertex2f(300, 200);
 
 	//céu por do sol
@@ -492,7 +491,7 @@ void animacaoTiro(int valor) {
 				transTiro = 0;
 			}
 			else {
-				transTiro -= 25;
+				transTiro -= 45;
 			}
 
 		}
@@ -501,7 +500,7 @@ void animacaoTiro(int valor) {
 				transTiro = 0;
 			}
 			else {
-				transTiro += 25;
+				transTiro += 45;
 			}
 		}
 	}
@@ -793,36 +792,36 @@ void keyboard(unsigned char tecla, int x, int y) {
 	//printf("\no mouse estava em %d x %d\n", x, y);
 	if (tecla == 'a' || tecla == 'A') {
 		if ((trans + posSubA) >= -300)
-			trans = trans - 3;
-		ultimaTecla = 1;
+			trans = trans - 5;
+			ultimaTecla = 1;
 		//printf("\n o valor de translacao e %.2f\n", trans);
 	}
 	if (tecla == 'd' || tecla == 'D') {
 		if ((trans + posSubD) <= 300)
-			trans = trans + 3;
-		ultimaTecla = 0;
+			trans = trans + 5;
+			ultimaTecla = 0;
 		//printf("\n o valor de translacao e %.2f\n", trans);
 	}
 	if (tecla == 's' || tecla == 'S') {
 		if (transH >= -200)
-			transH = transH - 3;
+			transH = transH - 5;
 		//printf("\n o valor de translacao H e %.2f\n", transH);
 	}
 	if (tecla == 'w' || tecla == 'W') {
 		if ((transH + posSubW) <= 151)
-			transH = transH + 3;
+			transH = transH + 5;
 		//printf("\n o valor de translacao H e %.2f\n", transH);
 	}
 	if (tecla == 'q' || tecla == 'Q') {
 		// Disparar um novo projétil
 		if (transTiro == 0) {
 			if (ultimaTecla == 0) {
-				transTiro = trans + 25;
+				transTiro = trans + 45;
 				transHTiro = transH; 
 				direcaoTiro = 0;
 			}
 			else if (ultimaTecla == 1) {
-				transTiro = trans - 25;
+				transTiro = trans - 45;
 				transHTiro = transH;
 				direcaoTiro = 1;
 			}
